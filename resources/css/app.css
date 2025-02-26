@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+.bg-green-500 { background-color: #22c55e !important; }
+.hover\:bg-green-600:hover { background-color: #16a34a !important; }
