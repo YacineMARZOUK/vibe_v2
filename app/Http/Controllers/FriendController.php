@@ -10,60 +10,62 @@ use Illuminate\Http\Request;
 class FriendController extends Controller
 {
     // Envoyer une demande d'ami
-public function sendFriendRequest($friendId)
-{
-    $sender = auth()->user();
-    $receiver = User::findOrFail($friendId);
-    
-    if ($sender->id === $receiver->id) {
-        return back()->with('error', 'Tu ne peux pas être ami avec toi-même.');
+    public function sendFriendRequest($friendId)
+    {
+        $sender = auth()->user();
+        $receiver = User::findOrFail($friendId);
+        
+        if ($sender->id === $receiver->id) {
+            return back()->with('error', 'Tu ne peux pas être ami avec toi-même.');
+        }
+        
+        // Use the Friendship model to query the database
+        $existingRequest = Friendship::where(function ($query) use ($sender, $receiver) {
+            $query->where('user_id', $sender->id)
+                  ->where('friend_id', $receiver->id)
+                  ->whereIn('status', ['pending', 'accepted']);
+        })->orWhere(function ($query) use ($sender, $receiver) {
+            $query->where('user_id', $receiver->id)
+                  ->where('friend_id', $sender->id)
+                  ->whereIn('status', ['pending', 'accepted']);
+        })->first();
+        
+        if ($existingRequest) {
+            return back()->with('error', 'Demande déjà envoyée ou déjà amis.');
+        }
+        
+        Friendship::create([
+            'user_id' => $sender->id,
+            'friend_id' => $receiver->id,
+            'status' => 'pending',
+        ]);
+        
+        return back()->with('success', 'Demande d\'ami envoyée.');
     }
     
-    $existingRequest = Friendship::where(function ($query) use ($sender, $receiver) {
-        $query->where('user_id', $sender->id)
-              ->where('friend_id', $receiver->id)
-              ->whereIn('status', ['pending', 'accepted']);
-    })->orWhere(function ($query) use ($sender, $receiver) {
-        $query->where('user_id', $receiver->id)
-              ->where('friend_id', $sender->id)
-              ->whereIn('status', ['pending', 'accepted']);
-    })->first();
-    
-    if ($existingRequest) {
-        return back()->with('error', 'Demande déjà envoyée ou déjà amis.');
-    }
-    
-    Friendship::create([
-        'user_id' => $sender->id,
-        'friend_id' => $receiver->id,
-        'status' => 'pending',
-    ]);
-    
-    return back()->with('success', 'Demande d\'ami envoyée.');
-}
 
     // Répondre à une demande d'ami (Accepter ou Rejeter)
-public function respondToFriendRequest($requestId, $action)
-{
-    $friendRequest = Friendship::findOrFail($requestId);
-    
-    // Check if the current user is the receiver of the request
-    if ($friendRequest->friend_id !== auth()->id()) {
-        return back()->with('error', 'Tu ne peux pas répondre à cette demande.');
+    public function respondToFriendRequest($requestId, $action)
+    {
+        $friendRequest = Friendship::findOrFail($requestId);
+        
+        // Check if the current user is the receiver of the request
+        if ($friendRequest->friend_id !== auth()->id()) {
+            return back()->with('error', 'Tu ne peux pas répondre à cette demande.');
+        }
+        
+        if ($action === 'accept') {
+            $friendRequest->status = 'accepted';
+            $friendRequest->save();
+            return back()->with('success', 'Demande d\'ami acceptée.');
+        } elseif ($action === 'reject') {
+            $friendRequest->status = 'declined';  // Make sure this is a string
+            $friendRequest->save();
+            return back()->with('error', 'Demande d\'ami rejetée.');
+        }
+        
+        return back()->with('error', 'Action non valide.');
     }
-    
-    if ($action === 'accept') {
-        $friendRequest->status = 'accepted';
-        $friendRequest->save();
-        return back()->with('success', 'Demande d\'ami acceptée.');
-    } elseif ($action === 'reject') {
-        $friendRequest->status = 'rejected';
-        $friendRequest->save();
-        return back()->with('success', 'Demande d\'ami rejetée.');
-    }
-    
-    return back()->with('error', 'Action non valide.');
-}
 
     // Lister les amis de l'utilisateur
     public function listFriends()

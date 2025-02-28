@@ -9,11 +9,29 @@ use Illuminate\Http\Request;
 class PostController extends Controller
 {   
     public function index()
-    {
-        $posts = Post::with('user')->get(); // Récupère les posts avec les utilisateurs associés
-        return view('posts.index', compact('posts')); // Passe les posts à la vue
+{
+    // Check if user is authenticated
+    if (!auth()->check()) {
+        return redirect()->route('login')
+            ->with('error', 'Veuillez vous connecter pour voir les publications.');
     }
-    // Créer une nouvelle publication
+    
+    $user = auth()->user();
+    
+    // Get friend IDs
+    $friendIds = $user->friends()->pluck('id')->toArray();
+    
+    // Add current user's ID to show their own posts too
+    $friendIds[] = $user->id;
+    
+    // Get posts from friends and the user with eager loading
+    $posts = Post::with(['user', 'comments.user', 'likes'])
+                ->whereIn('user_id', $friendIds)
+                ->latest()
+                ->get();
+    
+    return view('posts.index', compact('posts'));
+}
     public function create(Request $request)
     {
         // Debug information at the start
@@ -121,18 +139,33 @@ class PostController extends Controller
     if ($post->user_id !== auth()->id()) {
         return back()->with('error', 'Tu ne peux pas modifier cette publication.');
     }
-    
+
     // Validate input
     $request->validate([
         'content' => 'required',
+        'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
     ]);
 
-    // Update post
+    // Update content
     $post->content = $request->content;
+
+    // Handle image update
+    if ($request->hasFile('image')) {
+        // Delete old image if it exists
+        if ($post->image) {
+            \Storage::disk('public')->delete($post->image);
+        }
+
+        // Store new image
+        $imagePath = $request->file('image')->store('posts', 'public');
+        $post->image = $imagePath;
+    }
+
     $post->save();
 
     return redirect()->route('posts.index')->with('success', 'Publication mise à jour avec succès.');
 }
+
 
     // Supprimer une publication
     public function destroy($id)

@@ -20,6 +20,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -47,3 +48,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/friends', [FriendController::class, 'listFriends'])->name('friends.index');
     Route::post('/friend-request/{requestId}/{action}', [FriendController::class, 'respondToFriendRequest'])->name('friend.respond');
 });
+// Routes pour les commentaires
+Route::post('/posts/{post}/comments', [App\Http\Controllers\CommentController::class, 'store'])->name('comments.store');
+Route::delete('/comments/{comment}', [App\Http\Controllers\CommentController::class, 'destroy'])->name('comments.destroy');
+// likesss
+Route::post('/posts/{post}/like', [App\Http\Controllers\LikeController::class, 'toggle'])->name('posts.like')->middleware('auth');
