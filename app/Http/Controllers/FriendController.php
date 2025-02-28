@@ -68,9 +68,20 @@ class FriendController extends Controller
     }
 
     // Lister les amis de l'utilisateur
+    // Lister les amis de l'utilisateur
     public function listFriends()
     {
-        $friends = auth()->user()->friends;
+        $user = auth()->user();
+        
+        // Récupérer toutes les amitiés acceptées où l'utilisateur est impliqué
+        $friends = Friendship::where(function($query) use ($user) {
+            $query->where('user_id', $user->id)
+                  ->orWhere('friend_id', $user->id);
+        })
+        ->where('status', 'accepted')
+        ->with(['sender', 'receiver']) // Charger les relations
+        ->get();
+        
         return view('friends.index', compact('friends'));
     }
     
